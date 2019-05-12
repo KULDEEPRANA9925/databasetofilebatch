@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="31abc2eb-6807-42be-a96a-ec44d62c1ede" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="databasetofileforeachoracleFlow" doc:id="f29e482a-54b6-4e05-8b24-f6740ab46127" maxConcurrency="1">
+		<scheduler doc:name="Scheduler" doc:id="638f5702-4dc3-404f-a79c-d04129a96ec9" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="10000" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<db:select doc:name="Select" doc:id="515e071b-25f5-4913-baf6-94f95f020268" config-ref="Database_Config">
+			<db:sql >SELECT * FROM EMPLOYEE2</db:sql>
+		</db:select>
+		<logger level="INFO" doc:name="Logger" doc:id="1870d880-dac5-4745-92ed-82db26de99ed" message="#[payload]"/>
+		<batch:job jobName="databasetofilebatchBatch_Job" doc:id="79273411-836c-4be6-b454-9a28e91850f9" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="5e14239c-c115-4ed2-927c-cbd7cebc2eca" >
+					<ee:transform doc:name="Transform Message" doc:id="bdbaeed0-2c09-4531-9e77-9cb851e6b96c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/csv
+---
+[payload]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+					<file:read doc:name="Read" doc:id="c739b2de-fc92-438d-9247-c2cfb83e1ff1" path="H:\mule-batch\input\emp.csv" target="fileList"/>
+					<choice doc:name="Choice" doc:id="81c7d4fb-4592-49b6-aa3b-ab570d785888">
+				<when expression="#[isEmpty(vars.fileList)]">
+					<ee:transform doc:name="Transform Message" doc:id="3ab0e04b-200d-427e-8cbc-a11b0843f774">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/csv header=true
+---
+payload]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+				</when>
+				<otherwise>
+					<ee:transform doc:name="Transform Message" doc:id="a9d6ffc1-293a-4256-8082-a334d2f552c8">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/csv header=false
+---
+payload]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</otherwise>
+			</choice>
+					<file:write doc:name="Write" doc:id="057f5029-51c3-429a-9ca8-7ed414da6bd7" path="H:\mule-batch\input\emp.csv" mode="APPEND"/>
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+		<logger level="INFO" doc:name="Logger" doc:id="5eb80654-fef3-4c5b-95cc-23734ccc0f27" message="#[payload]"/>
+	</flow>
+	
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="d53d0cfc-236c-4975-833b-13c0ce6ea818">
+		<db:oracle-connection host="localhost" user="kuldeep" password="test" />
+	</db:config>
+
+</mule>
